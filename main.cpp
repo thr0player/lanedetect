@@ -20,7 +20,7 @@
 namespace LaneDetect {
     class DetectManager {
     public:
-        typedef message_filters::sync_policies::ExactTime <sensor_msgs::PointCloud2, geometry_msgs::PoseStamped> sync_policy_classification;
+        typedef message_filters::sync_policies::ApproximateTime <sensor_msgs::PointCloud2, geometry_msgs::PoseStamped> sync_policy_classification;
 
         DetectManager();
 
@@ -52,9 +52,9 @@ namespace LaneDetect {
 
 //        filtered_points_pub_ = node_handle_.advertise < pcl::PointCloud < pcl::PointXYZI >> (filtered_points_topic_, 10000);
 
-        message_filters::Subscriber <sensor_msgs::PointCloud2> lidar_sub(node_handle_, point_topic_, 100);
-        message_filters::Subscriber <geometry_msgs::PoseStamped> imu_sub(node_handle_, imu_topic_, 100);
-        message_filters::Synchronizer <sync_policy_classification> sync(sync_policy_classification(10), lidar_sub,
+        message_filters::Subscriber <sensor_msgs::PointCloud2> lidar_sub(node_handle_, point_topic_, 1000);
+        message_filters::Subscriber <geometry_msgs::PoseStamped> imu_sub(node_handle_, imu_topic_, 1000);
+        message_filters::Synchronizer <sync_policy_classification> sync(sync_policy_classification(100), lidar_sub,
                                                                         imu_sub);
 
         sync.registerCallback(boost::bind(&DetectManager::LidarCallback, this, _1, _2));
