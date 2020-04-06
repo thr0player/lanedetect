@@ -45,6 +45,7 @@ message(STATUS "------->opencv inc found: ${OpenCV_LIBRARIES}")
 include_directories(
         ${catkin_INCLUDE_DIRS}
         include
+        include/utils
 )
 
 SET(CMAKE_CXX_FLAGS "-O2 -g -Wall ${CMAKE_CXX_FLAGS}")
@@ -56,14 +57,17 @@ add_definitions(${PCL_DEFINITIONS})
 
 add_executable(lanedetection
         main.cpp
+        src/aggregation.cc
         )
 
 target_include_directories(lanedetection PRIVATE
         ${PCL_INCLUDE_DIRS}
+        ${OpenCV_INCLUDE_DIRS}
         )
 
 target_link_libraries(lanedetection
         ${catkin_LIBRARIES}
         ${PCL_LIBRARIES}
+        ${OpenCV_LIBS}
         )
-add_dependencies(lanedetection ${catkin_EXPORTED_TARGETS})
+add_dependencies(lanedetection ${catkin_EXPORTED_TARGETS} )
