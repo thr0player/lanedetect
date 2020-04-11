@@ -13,15 +13,18 @@
 #include <Eigen/Core>
 
 #include <assert.h>
+
 namespace LaneDetect {
 
-#define IMAGE_HEIGHT 600
-#define IMAGE_WIDTH 2000
-#define RES_STEP 0.04
+    const int IMAGE_HEIGHT = 600;
+    const int IMAGE_WIDTH = 2000;
+    const float RES_STEP = 0.05;
+
+    const float EPS = 1e-6;
 
     typedef pcl::PointXYZI PPoint;
 
-    class Frame{
+    class Frame {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         pcl::PointCloud<PPoint>::Ptr lidar;

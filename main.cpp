@@ -40,10 +40,12 @@ namespace LaneDetect {
         ros::NodeHandle node_handle_;
         ros::Subscriber points_node_sub_;
         ros::Publisher filtered_points_pub_;
+        ros::Publisher label_points_pub_;
 
         std::string point_topic_;
         std::string imu_topic_;
         std::string filtered_points_topic_;
+        std::string label_points_topic_;
 
         ros::Time t1_;
         ros::Time t2_;
@@ -62,7 +64,7 @@ namespace LaneDetect {
                            const geometry_msgs::PoseStampedConstPtr &imu_msg);
     };
 
-    DetectManager::DetectManager() : node_handle_("~"), lidar_size_(30) {
+    DetectManager::DetectManager() : node_handle_("~"), lidar_size_(20) {
         ROS_INFO("Inititalizing BucketFiltering node ...");
         node_handle_.param<std::string>("point_topic", point_topic_, "/velodyne_points");
         ROS_INFO("Input Point Cloud: %s", point_topic_.c_str());
@@ -73,7 +75,11 @@ namespace LaneDetect {
         node_handle_.param<std::string>("outlidar_topic", filtered_points_topic_, "/agg_lidar");
         ROS_INFO("output lidar Cloud: %s", filtered_points_topic_.c_str());
 
+        node_handle_.param<std::string>("label_lidar_topic", label_points_topic_, "/agg_label_lidar");
+        ROS_INFO("output label_lidar Cloud: %s", label_points_topic_.c_str());
+
         filtered_points_pub_ = node_handle_.advertise<pcl::PointCloud<PPoint>>(filtered_points_topic_, 10000);
+        label_points_pub_ = node_handle_.advertise<pcl::PointCloud<PPoint>>(label_points_topic_, 10000);
 
         message_filters::Subscriber <sensor_msgs::PointCloud2> lidar_sub(node_handle_, point_topic_, 1000);
         message_filters::Subscriber <geometry_msgs::PoseStamped> imu_sub(node_handle_, imu_topic_, 1000);
@@ -169,10 +175,14 @@ namespace LaneDetect {
 
 
         pcl::PointCloud<PPoint>::Ptr out_pc(new pcl::PointCloud<PPoint>());
-        aggregation_.Process(data_buffer_, world_imu_, imu_vel_, 20, out_pc);
+        pcl::PointCloud<PPoint>::Ptr out_labelpc(new pcl::PointCloud<PPoint>());
+        aggregation_.Process(data_buffer_, world_imu_, imu_vel_, 20, out_pc, out_labelpc);
 
         out_pc->header = c_in_cloud->header;
+        out_labelpc->header = c_in_cloud->header;
+
         filtered_points_pub_.publish(out_pc);
+        label_points_pub_.publish(out_labelpc);
         t2_ = ros::Time().now();
         elap_time_ = t2_ - t1_;
 
