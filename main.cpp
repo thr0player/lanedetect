@@ -26,6 +26,7 @@
 #include "utils/common.h"
 
 #include "aggregation.h"
+#include "cca.cc"
 
 namespace LaneDetect {
 

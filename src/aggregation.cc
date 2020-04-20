@@ -8,6 +8,9 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 
+#include "cca.cc"
+#include <map>
+
 #include <assert.h>
 namespace LaneDetect {
 
@@ -27,8 +30,7 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
         Eigen::Matrix4f curpose = startpose.inverse() * data_buffer.at(di).pose * imu_vel;
         pcl::transformPointCloud(*data_buffer.at(di).lidar, localpc, curpose);
 
-        ROS_INFO("[Aggregation]: cur %zu size %zu ", di, pc->size());
-
+//        ROS_INFO("[Aggregation]: cur %zu size %zu ", di, pc->size());
         (*pc) += (localpc);
     }
 
@@ -216,35 +218,46 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
     pc = new_fpc;
 
     ///// clustering
-//    if (labelpc != nullptr) {
-//        labelpc->clear();
-//
-//        std::vector<pcl::PointIndices> cluster_indices;
-//
-//        ToPclPc(new_fpc, fpc);
-//        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-//        tree->setInputCloud(fpc);
-//
-//        pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-//        ec.setClusterTolerance(0.2); // 2cm
-//        ec.setSearchMethod(tree);
-//        ec.setInputCloud(fpc);
-//        ec.extract(cluster_indices);
-//
-//        int j = 1;
-//        for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
-//        {
-//            if (it->indices.size() < 50) continue;
-//            for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
-//            {
-//                PPoint pp = new_fpc->points.at(*pit);
-//                pp.intensity = j;
-//                labelpc->points.emplace_back(pp);
-//            }
-//            j++;
-//        }
-//
-//    }
+    cv::Mat _lableImg;
+    std::set<int> labels;
+
+
+    ros::Time t1=ros::Time::now();
+    CcaByTwoPass(img, _lableImg, labels);
+    ros::Duration elap_timet = ros::Time::now()-t1;
+    double dur = elap_timet.toSec();
+    ROS_INFO("CCA time: %f",dur);
+
+    std::map<int,int> label_map;
+    for(auto &si:labels){
+        label_map[si] = label_map.size();
+    }
+
+    ROS_INFO("clustered label size: %zu",labels.size());
+
+    std::vector<cv::Vec3b> color_table;
+    for (size_t ci = 0; ci < labels.size()+10; ++ci) {
+        color_table.emplace_back(cv::Vec3b(rand()%255, rand()%255, rand()%255));
+    }
+    cv::Mat color_label;
+    cv::cvtColor(img, color_label, CV_GRAY2BGR);
+
+
+    for (int row = 0; row < _lableImg.rows; ++row) {
+        for (int col = 0; col < _lableImg.cols; ++col) {
+            const int &label = _lableImg.at<int>(row, col);
+            if(label !=0 ){
+                int idx = label_map[label];
+                color_label.at<cv::Vec3b>(row,col)[0] = color_table.at(idx).val[0];
+                color_label.at<cv::Vec3b>(row,col)[1] = color_table.at(idx).val[1];
+                color_label.at<cv::Vec3b>(row,col)[2] = color_table.at(idx).val[2];
+            }
+        }
+    }
+//    cv::imshow("_lableImg",_lableImg);
+
+    cv::imshow("color_label",color_label);
+    cv::waitKey(30);
 }
 
 void Aggregation::ToPclPc(pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<pcl::PointXYZ>::Ptr &pclpc) {

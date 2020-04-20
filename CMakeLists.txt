@@ -46,6 +46,7 @@ include_directories(
         ${catkin_INCLUDE_DIRS}
         include
         include/utils
+        src
 )
 
 SET(CMAKE_CXX_FLAGS "-O2 -g -Wall ${CMAKE_CXX_FLAGS}")
@@ -58,6 +59,7 @@ add_definitions(${PCL_DEFINITIONS})
 add_executable(lanedetection
         main.cpp
         src/aggregation.cc
+        src/cca.cc
         )
 
 target_include_directories(lanedetection PRIVATE

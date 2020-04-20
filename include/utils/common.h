@@ -18,7 +18,7 @@ namespace LaneDetect {
 
     const int IMAGE_HEIGHT = 600;
     const int IMAGE_WIDTH = 2000;
-    const float RES_STEP = 0.05;
+    const float RES_STEP = 0.08;
 
     const float EPS = 1e-6;
 
@@ -31,6 +31,19 @@ namespace LaneDetect {
         Eigen::Matrix4f pose;
 
     };
+
+#define  REPEAT_TEST_EXIT(...) \
+  do \
+  { \
+    static int hit = 0; \
+    if (hit > (__VA_ARGS__)) \
+    { \
+      exit(0); \
+    } \
+    hit++; \
+    std::cout<<"r_test_"<<hit<<std::endl; \
+  } while(0)
+
 
 }
 #endif //LANEDETECTION_COMMON_H
