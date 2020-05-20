@@ -229,11 +229,14 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
     ROS_INFO("CCA time: %f",dur);
 
     std::map<int,int> label_map;
+    std::map<int,int> label_map_idx;
+    int labelcnt = 2;
     for(auto &si:labels){
         label_map[si] = label_map.size();
+        label_map_idx[si] = labelcnt;
+        labelcnt++;
     }
 
-    ROS_INFO("clustered label size: %zu",labels.size());
 
     std::vector<cv::Vec3b> color_table;
     for (size_t ci = 0; ci < labels.size()+10; ++ci) {
@@ -257,7 +260,28 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
 //    cv::imshow("_lableImg",_lableImg);
 
     cv::imshow("color_label",color_label);
-    cv::waitKey(30);
+    cv::waitKey(15);
+
+    //// assign label to pc
+    if (labelpc == nullptr) {
+        ROS_INFO("clustered label size: %zu", labels.size());
+        return;
+    }
+
+    for(auto &pi:pc->points) {
+        int col = round(pi.x / RES_STEP + cx);
+        int row = round(-pi.y / RES_STEP + cy);
+
+        if (col < 0 || col > IMAGE_WIDTH - 1 || row < 0 || row > IMAGE_HEIGHT - 1) {
+            continue;
+        }
+
+        const int &label = _lableImg.at<int>(row, col);
+        PPoint tmpp = pi;
+        tmpp.intensity = label_map_idx[label];
+        labelpc->points.emplace_back(tmpp);
+    }
+    ROS_INFO("clustered label size: %zu, agg pc: %zu, labelpc: %zu", labels.size(), pc->size(), labelpc->size());
 }
 
 void Aggregation::ToPclPc(pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<pcl::PointXYZ>::Ptr &pclpc) {
