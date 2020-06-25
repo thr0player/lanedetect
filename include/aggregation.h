@@ -19,12 +19,22 @@ namespace LaneDetect {
             countimg = cv::Mat(IMAGE_HEIGHT, IMAGE_WIDTH, CV_32SC1);
             imgzmin = cv::Mat(IMAGE_HEIGHT, IMAGE_WIDTH, CV_32SC1);
             imgzmax= cv::Mat(IMAGE_HEIGHT, IMAGE_WIDTH, CV_32SC1);
+
+            save_labelimg_ = true;
+            labelimg_empty_ = true;
+
+            if(save_labelimg_){
+
+//                std::
+            }
         };
 
         void Process(const std::deque<Frame> &data_buffer, const Eigen::Matrix4f &world_imu, const Eigen::Matrix4f &imu_vel,
-                     int frame_size, pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<PPoint>::Ptr& labelpc);
+                     int frame_size, pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<PPoint>::Ptr& labelpc, uint64_t timestamp);
 
         void ToPclPc(pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<pcl::PointXYZ>::Ptr &pclpc);
+
+        static void SaveLabelImg(std::map<int, std::vector<cv::Point>> &label_map_point);
 
     private:
         cv::Mat img; //(IMAGE_HEIGHT, IMAGE_WIDTH, CV_8UC1);
@@ -33,6 +43,8 @@ namespace LaneDetect {
         cv::Mat imgzmin; //(IMAGE_HEIGHT, IMAGE_WIDTH, CV_32SC1);
         cv::Mat imgzmax; //(IMAGE_HEIGHT, IMAGE_WIDTH, CV_32SC1);
 
+        bool save_labelimg_;
+        bool labelimg_empty_;
     };
 
 }

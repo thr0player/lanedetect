@@ -16,9 +16,9 @@
 
 namespace LaneDetect {
 
-    const int IMAGE_HEIGHT = 600;
-    const int IMAGE_WIDTH = 2000;
-    const float RES_STEP = 0.08;
+    const int IMAGE_HEIGHT = 900;
+    const int IMAGE_WIDTH = 3000;
+    const float RES_STEP = 0.04;//0.08
 
     const float EPS = 1e-6;
 

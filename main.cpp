@@ -65,7 +65,7 @@ namespace LaneDetect {
                            const geometry_msgs::PoseStampedConstPtr &imu_msg);
     };
 
-    DetectManager::DetectManager() : node_handle_("~"), lidar_size_(20) {
+    DetectManager::DetectManager() : node_handle_("~"), lidar_size_(30) {
         ROS_INFO("Inititalizing BucketFiltering node ...");
         node_handle_.param<std::string>("point_topic", point_topic_, "/velodyne_points");
         ROS_INFO("Input Point Cloud: %s", point_topic_.c_str());
@@ -177,7 +177,8 @@ namespace LaneDetect {
 
         pcl::PointCloud<PPoint>::Ptr out_pc(new pcl::PointCloud<PPoint>());
         pcl::PointCloud<PPoint>::Ptr out_labelpc(new pcl::PointCloud<PPoint>());
-        aggregation_.Process(data_buffer_, world_imu_, imu_vel_, 20, out_pc, out_labelpc);
+        aggregation_.Process(data_buffer_, world_imu_, imu_vel_, 20, out_pc, out_labelpc,
+                             in_cloud_msg->header.stamp.toNSec());
 
         out_pc->header = c_in_cloud->header;
         out_labelpc->header = c_in_cloud->header;

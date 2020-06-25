@@ -24,7 +24,7 @@ catkin_package(CATKIN_DEPENDS
         )
 
 add_definitions(-std=c++11)
-SET(CMAKE_CXX_FLAGS "-O2 -g -Wall ${CMAKE_CXX_FLAGS}")
+SET(CMAKE_CXX_FLAGS "-O3 -g -Wall ${CMAKE_CXX_FLAGS}")
 
 #set(OpenCV_DIR "/usr/local/share/OpenCV")
 

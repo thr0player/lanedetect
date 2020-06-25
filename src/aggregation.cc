@@ -11,11 +11,16 @@
 #include "cca.cc"
 #include <map>
 
+#include<boost/filesystem.hpp>
+
 #include <assert.h>
 namespace LaneDetect {
+namespace bf=boost::filesystem;//简单别名
+
 
 void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Matrix4f &world_imu, const Eigen::Matrix4f &imu_vel,
-             int frame_size, pcl::PointCloud<PPoint>::Ptr& pc, pcl::PointCloud<PPoint>::Ptr& labelpc) {
+                          int frame_size, pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<PPoint>::Ptr &labelpc,
+                          uint64_t timestamp) {
 
     if (data_buffer.size() <= frame_size) {
         return;
@@ -228,15 +233,16 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
     double dur = elap_timet.toSec();
     ROS_INFO("CCA time: %f",dur);
 
-    std::map<int,int> label_map;
-    std::map<int,int> label_map_idx;
+    std::map<int,int> label_map;     // label : cnt(0 -> n)
+    std::map<int,int> label_map_idx; // label : label_idx(2 -> n-2)
+    std::map<int,std::vector<cv::Point>> label_map_point;
     int labelcnt = 2;
     for(auto &si:labels){
         label_map[si] = label_map.size();
         label_map_idx[si] = labelcnt;
+        label_map_point[si] = std::vector<cv::Point>();
         labelcnt++;
     }
-
 
     std::vector<cv::Vec3b> color_table;
     for (size_t ci = 0; ci < labels.size()+10; ++ci) {
@@ -244,7 +250,6 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
     }
     cv::Mat color_label;
     cv::cvtColor(img, color_label, CV_GRAY2BGR);
-
 
     for (int row = 0; row < _lableImg.rows; ++row) {
         for (int col = 0; col < _lableImg.cols; ++col) {
@@ -254,13 +259,70 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
                 color_label.at<cv::Vec3b>(row,col)[0] = color_table.at(idx).val[0];
                 color_label.at<cv::Vec3b>(row,col)[1] = color_table.at(idx).val[1];
                 color_label.at<cv::Vec3b>(row,col)[2] = color_table.at(idx).val[2];
+
+                label_map_point[idx].emplace_back(cv::Point(col, row));
             }
         }
     }
-//    cv::imshow("_lableImg",_lableImg);
 
-    cv::imshow("color_label",color_label);
-    cv::waitKey(15);
+//    cv::imshow("_lableImg",_lableImg);
+//    cv::imshow("color_label",color_label);
+//    cv::waitKey(15);
+
+
+    /////// check all the points
+    std::string save_dir = "/tmp/save_dir/";
+    bf::path path(save_dir);
+
+    if (!bf::exists(path)) {
+        //目录不存在，创建
+        ROS_INFO("Create %s", path.c_str());
+        bf::create_directory(path);
+    }
+
+    bf::path file_path = path / (std::to_string(timestamp) + "_saveimg"); //path重载了 / 运算符
+    bf::create_directory(file_path);
+
+
+    cv::Mat testimg = color_label.clone();
+    testimg.setTo(0);
+    for (auto &label_map_p: label_map_point) {
+        if (label_map_p.second.size() < 10) continue;
+        if (label_map_p.second.size() > 1500) continue;
+
+        // get range
+        cv::Point minp(-1, -1), maxp(-1, -1);
+        for (auto &pp: label_map_p.second) {
+            if (minp.x < 0)minp.x = pp.x;
+            if (minp.y < 0)minp.y = pp.y;
+            if (maxp.x < 0)maxp.x = pp.x;
+            if (maxp.x < 0)maxp.y = pp.y;
+
+            if (minp.x > pp.x) minp.x = pp.x;
+            if (minp.y > pp.y) minp.y = pp.y;
+            if (maxp.x < pp.x) maxp.x = pp.x;
+            if (maxp.y < pp.y) maxp.y = pp.y;
+        }
+
+        //draw img
+
+        cv::Mat saveimg(maxp.y - minp.y + 10, maxp.x - minp.x + 10, CV_8SC1,cv::Scalar(0));
+        for (auto &pp: label_map_p.second) {
+            cv::circle(saveimg, cv::Point(pp.x - minp.x, pp.y - minp.y), 1, cv::Scalar(255));
+        }
+
+        //save
+        bf::path filename = file_path / bf::path(std::to_string(label_map_p.first) + ".png");
+        cv::imwrite(filename.string(), saveimg);
+
+
+//        cv::imshow("lableImg",testimg);
+//        cv::waitKey();
+    }
+    bf::path filename = file_path / bf::path(std::to_string(timestamp) + ".png");
+
+    cv::imwrite(filename.string(), color_label);
+
 
     //// assign label to pc
     if (labelpc == nullptr) {
