@@ -16,10 +16,11 @@
 
 namespace LaneDetect {
 
-    const int IMAGE_HEIGHT = 900;
-    const int IMAGE_WIDTH = 3000;
+    const int IMAGE_HEIGHT = 500;
+    const int IMAGE_WIDTH = 800;
     const float RES_STEP = 0.04;//0.08
 
+    const int CCA_NEIGHBOR = 10;
     const float EPS = 1e-6;
 
     typedef pcl::PointXYZI PPoint;

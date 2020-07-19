@@ -8,7 +8,7 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-#include "cca.cc"
+#include "cca.h"
 #include <map>
 
 #include<boost/filesystem.hpp>
@@ -20,9 +20,10 @@ namespace bf=boost::filesystem;//简单别名
 
 void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Matrix4f &world_imu, const Eigen::Matrix4f &imu_vel,
                           int frame_size, pcl::PointCloud<PPoint>::Ptr &pc, pcl::PointCloud<PPoint>::Ptr &labelpc,
-                          uint64_t timestamp) {
+                          uint64_t timestamp, cv::Mat &pc_img) {
 
     if (data_buffer.size() <= frame_size) {
+        pc_img = cv::Mat();
         return;
     }
     const float cx = IMAGE_WIDTH * 0.5;
@@ -121,7 +122,7 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
                 imgzmin.at<float>(row, col) = pi.z;
             }
 
-            if (pi.intensity * 255 < 100) continue;
+            if (pi.intensity * 255 < 120) continue;
 
             img.at<uchar>((row), (col)) = pi.intensity * 255;
         }
@@ -140,22 +141,27 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
 
 //    ProjImg();
 //    AvgImg();
-    MaxImg();
+    MaxImg();//get highest point
 
     ////filter image
-    bool enableshowimage = false;
+    bool enableshowimage = true;
     if (enableshowimage ) {
-        cv::imshow("img", img);
+        cv::imshow("max_img", img);
     }
-    cv::medianBlur(img, img, 3);
-    cv::dilate(img, img, 3);
+    int element_size=1;
+    int z = element_size * 2 + 1;
+    cv::Mat structureElement = getStructuringElement(cv::MORPH_RECT, cv::Size(z, z), cv::Point(-1, -1));
+    //dilate(src, dst, structureElement, Point(-1, -1), 1);
+//    cv::medianBlur(img, img, 3);
+//    cv::erode(img, img, structureElement,  cv::Point(-1, -1), 1);
+    cv::dilate(img, img, structureElement,  cv::Point(-1, -1), 1);
 
     if (enableshowimage ) {
-        cv::imshow("filter img", img);
+//        cv::imshow("filter img", img);
 //        cv::waitKey(60);
     }
 
-    //////part.2 filter pointcloud
+    //////part.2 filter pointcloud  by boundary
     pcl::PointCloud<pcl::PointXYZ>::Ptr fpc(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::PointCloud<PPoint>::Ptr new_fpc(new pcl::PointCloud<PPoint>());
 
@@ -171,31 +177,6 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
             new_fpc->points.emplace_back(pi);
         }
     }
-//
-//    pcl::PointCloud<pcl::PointXYZ>::Ptr pc_bak(new pcl::PointCloud<pcl::PointXYZ>());
-//    ToPclPc(pc, pc_bak);
-//
-//    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-//    tree->setInputCloud(pc_bak);
-//
-//    const float r = 0.2;
-//    for (auto &pp: fpc->points) {
-//        std::vector<int> pointIdxNKNSearch;
-//        std::vector<float> pointNKNSquaredDistance;
-//
-//        tree->radiusSearch(pp, r, pointIdxNKNSearch, pointNKNSquaredDistance);
-//        if (pointIdxNKNSearch.size() > 0) {
-//
-//            for (auto &pidx:pointIdxNKNSearch) {
-//                if (pc->points.at(pidx).intensity * 255 > 30)
-//                    new_fpc->points.emplace_back(pc->points.at(pidx));
-//            }
-//
-//        }else{
-//            std::cout<<"[WARNING] not found"<<std::endl;
-//        }
-//    }
-
     auto ProjToImg=[this,cx,cy](cv::Mat&img, pcl::PointCloud<PPoint>::Ptr& pc){
         img.setTo(0);
         for (auto &pi:pc->points) {
@@ -213,22 +194,22 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
         }
     };
 
-    if (enableshowimage ) {
-        cv::Mat showimg = img.clone();
-        ProjToImg(showimg, new_fpc);
-        cv::imshow("final img", showimg);
-        cv::waitKey(60);
-    }
+//    if (enableshowimage ) {
+//        cv::Mat showimg = img.clone();
+//        ProjToImg(showimg, new_fpc);
+//        cv::imshow("final img", showimg);
+//        cv::waitKey(60);
+//    }
 
     pc = new_fpc;
+    pc_img = img.clone();
 
     ///// clustering
     cv::Mat _lableImg;
     std::set<int> labels;
 
-
     ros::Time t1=ros::Time::now();
-    CcaByTwoPass(img, _lableImg, labels);
+    CcaByTwoPass(img, _lableImg, labels, CCA_NEIGHBOR, CCA_NEIGHBOR);
     ros::Duration elap_timet = ros::Time::now()-t1;
     double dur = elap_timet.toSec();
     ROS_INFO("CCA time: %f",dur);
@@ -265,64 +246,65 @@ void Aggregation::Process(const std::deque<Frame> &data_buffer, const Eigen::Mat
         }
     }
 
-//    cv::imshow("_lableImg",_lableImg);
-//    cv::imshow("color_label",color_label);
-//    cv::waitKey(15);
-
-
-    /////// check all the points
-    std::string save_dir = "/tmp/save_dir/";
-    bf::path path(save_dir);
-
-    if (!bf::exists(path)) {
-        //目录不存在，创建
-        ROS_INFO("Create %s", path.c_str());
-        bf::create_directory(path);
+    if (enableshowimage) {
+//        cv::imshow("_lableImg", _lableImg);//cluster index
+        cv::imshow("color_clustering", color_label);
+        cv::waitKey(15);
     }
 
-    bf::path file_path = path / (std::to_string(timestamp) + "_saveimg"); //path重载了 / 运算符
-    bf::create_directory(file_path);
+    /////// check all the points
+    save_labelimg_ = false;
+    if (save_labelimg_) {
 
+        std::string save_dir = "/tmp/save_dir/";
+        bf::path path(save_dir);
 
-    cv::Mat testimg = color_label.clone();
-    testimg.setTo(0);
-    for (auto &label_map_p: label_map_point) {
-        if (label_map_p.second.size() < 10) continue;
-        if (label_map_p.second.size() > 1500) continue;
-
-        // get range
-        cv::Point minp(-1, -1), maxp(-1, -1);
-        for (auto &pp: label_map_p.second) {
-            if (minp.x < 0)minp.x = pp.x;
-            if (minp.y < 0)minp.y = pp.y;
-            if (maxp.x < 0)maxp.x = pp.x;
-            if (maxp.x < 0)maxp.y = pp.y;
-
-            if (minp.x > pp.x) minp.x = pp.x;
-            if (minp.y > pp.y) minp.y = pp.y;
-            if (maxp.x < pp.x) maxp.x = pp.x;
-            if (maxp.y < pp.y) maxp.y = pp.y;
+        if (!bf::exists(path)) {
+            //目录不存在，创建
+            ROS_INFO("Create %s", path.c_str());
+            bf::create_directory(path);
         }
 
-        //draw img
+        bf::path file_path = path / (std::to_string(timestamp) + "_saveimg"); //path重载了 / 运算符
+        bf::create_directory(file_path);
 
-        cv::Mat saveimg(maxp.y - minp.y + 10, maxp.x - minp.x + 10, CV_8SC1,cv::Scalar(0));
-        for (auto &pp: label_map_p.second) {
-            cv::circle(saveimg, cv::Point(pp.x - minp.x, pp.y - minp.y), 1, cv::Scalar(255));
-        }
+        cv::Mat testimg = color_label.clone();
+        testimg.setTo(0);
+        for (auto &label_map_p: label_map_point) {
+            if (label_map_p.second.size() < 10) continue;
+            if (label_map_p.second.size() > 1500) continue;
 
-        //save
-        bf::path filename = file_path / bf::path(std::to_string(label_map_p.first) + ".png");
-        cv::imwrite(filename.string(), saveimg);
+            // get range
+            cv::Point minp(-1, -1), maxp(-1, -1);
+            for (auto &pp: label_map_p.second) {
+                if (minp.x < 0)minp.x = pp.x;
+                if (minp.y < 0)minp.y = pp.y;
+                if (maxp.x < 0)maxp.x = pp.x;
+                if (maxp.x < 0)maxp.y = pp.y;
 
+                if (minp.x > pp.x) minp.x = pp.x;
+                if (minp.y > pp.y) minp.y = pp.y;
+                if (maxp.x < pp.x) maxp.x = pp.x;
+                if (maxp.y < pp.y) maxp.y = pp.y;
+            }
+
+            //draw img
+            cv::Mat saveimg(maxp.y - minp.y + 10, maxp.x - minp.x + 10, CV_8SC1, cv::Scalar(0));
+            for (auto &pp: label_map_p.second) {
+                cv::circle(saveimg, cv::Point(pp.x - minp.x, pp.y - minp.y), 1, cv::Scalar(255));
+            }
+
+            //save
+            bf::path filename = file_path / bf::path(std::to_string(label_map_p.first) + ".png");
+            cv::imwrite(filename.string(), saveimg);
 
 //        cv::imshow("lableImg",testimg);
 //        cv::waitKey();
+        }
+        bf::path filename = file_path / bf::path(std::to_string(timestamp) + ".png");
+
+        cv::imwrite(filename.string(), color_label);
     }
-    bf::path filename = file_path / bf::path(std::to_string(timestamp) + ".png");
-
-    cv::imwrite(filename.string(), color_label);
-
 
     //// assign label to pc
     if (labelpc == nullptr) {

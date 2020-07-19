@@ -1,17 +1,20 @@
 //
-// from https://blog.csdn.net/icvpr/article/details/10259577
+// Created by lw on 2020/7/29.
 //
+
+#ifndef LANEDETECTION_CCA_H
+#define LANEDETECTION_CCA_H
 
 #include <iostream>
 #include <string>
 #include <list>
 #include <vector>
 #include "utils/common.h"
-
 #include <opencv2/opencv.hpp>
- namespace LaneDetect {
+namespace LaneDetect {
 
-    static void CcaByTwoPass(const cv::Mat &_binImg, cv::Mat &_lableImg, std::set<int>& labels, int col_neighbor=10, int row_neighbor =10) {
+    static void CcaByTwoPass(const cv::Mat &_binImg, cv::Mat &_lableImg, std::set<int> &labels, int col_neighbor = 10,
+                             int row_neighbor = 10) {
         // connected component analysis (4-component)
         // use two-pass algorithm
         // 1. first pass: label each foreground pixel with a label
@@ -125,4 +128,8 @@
             }
         }
     }
-}// namespace
+}
+
+
+
+#endif //LANEDETECTION_CCA_H
